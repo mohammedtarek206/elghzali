@@ -2,11 +2,16 @@
   command = "npm run build"
   publish = "dist"
 
-# Proxy API requests through Netlify function to avoid CORS
-# Using rewrite to pass POST body correctly
+# Proxy API requests through Netlify functions to avoid CORS
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/api-proxy"
+  from = "/api/Auth/login"
+  to = "/.netlify/functions/auth-login"
+  status = 200
+  force = true
+  
+[[redirects]]
+  from = "/api/Auth/register"
+  to = "/.netlify/functions/auth-register"
   status = 200
   force = true
 

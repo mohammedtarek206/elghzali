@@ -26,28 +26,63 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Extract the API path from the original request
-  // Netlify passes the original path in x-netlify-original-path header or rawPath
-  let path = event.headers['x-netlify-original-path'] || 
-             event.rawPath || 
-             event.path;
+  // Determine API path from the original request URL
+  // Since we have specific redirects, we can determine the path from headers or request body
+  let path = '';
   
-  // Remove /api prefix if present
-  if (path.startsWith('/api')) {
-    path = path.replace('/api', '');
+  // Check all possible headers that Netlify might set
+  const originalPath = event.headers['x-netlify-original-path'] || 
+                       event.headers['x-forwarded-uri'] ||
+                       event.headers['referer']?.split('?')[0] ||
+                       '';
+  
+  // Extract path from original request
+  if (originalPath) {
+    if (originalPath.includes('/api/Auth/login')) {
+      path = '/Auth/login';
+    } else if (originalPath.includes('/api/Auth/register')) {
+      path = '/Auth/register';
+    } else if (originalPath.includes('/api/')) {
+      // Extract path after /api/
+      const match = originalPath.match(/\/api(\/.*?)(?:\?|$)/);
+      if (match) {
+        path = match[1];
+      }
+    }
   }
   
-  // Remove function path if present
-  if (path.includes('/.netlify/functions/api-proxy')) {
-    path = path.replace('/.netlify/functions/api-proxy', '');
+  // If still no path, try to determine from request body
+  if (!path && event.body) {
+    try {
+      const body = JSON.parse(event.body);
+      if (body.LoginType !== undefined) {
+        path = '/Auth/login';
+      } else if (body.FullName !== undefined || body.UserName !== undefined) {
+        path = '/Auth/register';
+      }
+    } catch (e) {
+      // Body parsing failed, ignore
+    }
   }
   
-  // Ensure path starts with /
-  if (!path.startsWith('/')) {
-    path = '/' + path;
+  // Fallback: use common paths
+  if (!path) {
+    // Default based on common patterns
+    path = '/Auth/login'; // Default, but this shouldn't happen
   }
   
   const apiUrl = `https://elghazaly.runasp.net/api${path}`;
+  
+  console.log('=== Proxy Debug Info ===');
+  console.log('Event path:', event.path);
+  console.log('Event rawPath:', event.rawPath);
+  console.log('Original path header:', event.headers['x-netlify-original-path']);
+  console.log('X-Forwarded-URI:', event.headers['x-forwarded-uri']);
+  console.log('All headers:', Object.keys(event.headers));
+  console.log('Determined path:', path);
+  console.log('Final API URL:', apiUrl);
+  console.log('Request body preview:', event.body?.substring(0, 200));
+  console.log('========================');
 
   console.log('Proxying request to:', apiUrl);
   console.log('Request body:', event.body);
